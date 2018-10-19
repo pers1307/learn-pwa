@@ -1,3 +1,7 @@
+if (!window.Promise) {
+    window.Promise = Promise;
+}
+
 // Если поддержываются воркеры
 if ('serviceWorker' in navigator) {
     // загрузить их из файла
