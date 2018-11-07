@@ -22,6 +22,21 @@ var STATIC_FILES = [
     'https://fonts.gstatic.com/s/materialicons/v41/flUhRq6tzZclQEJ-Vdg-IuiaDsNc.woff2',
 ];
 
+/**
+ * Удалять лишние элементы кэша
+ */
+// function trimCache(cacheName, maxItems) {
+//     caches.open(cacheName)
+//         .then(function (cache) {
+//             return cache.keys().then(function (keys) {
+//                 if (keys.length > maxItems) {
+//                     cache.delete(keys[0])
+//                         .then(trimCache(cacheName, maxItems));
+//                 }
+//             });
+//         });
+// }
+
 self.addEventListener('install', function (event) {
     console.log('[Service Worker] Installing Service Worker ...', event);
 
@@ -70,6 +85,24 @@ self.addEventListener('activate', function (event) {
 
 self.addEventListener('fetch', function (event) {
     console.log('[Service Worker] Fetching something ...', event);
+
+    var url = 'https://pwagram-99adf.firebaseio.com/posts';
+
+    if (event.request.url.indexOf(url) > -1) {
+        event.respondWith(
+            caches.open(CACHE_DYNAMIC_NAME)
+                .then(function (cache) {
+                    return fetch(event.request)
+                        .then(function (res) {
+                            // trimCache(CACHE_DYNAMIC_NAME, 3);
+                            cache.put(event.request, res.clone());
+                            return res;
+                        });
+                })
+        );
+    }
+
+
     event.respondWith(
         /**
          * Проверить существует ли в кэше этот файл, если

@@ -19,6 +19,18 @@ function openCreatePostModal() {
     });
 
     deferredPrompt = null;
+
+      /**
+       * Убить все sw
+       */
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations()
+          .then(function (registrations) {
+              for (var i = 0; i < registrations.lenght; i++) {
+                  registrations[i].unregister();
+              }
+          });
+    }
   }
 }
 
