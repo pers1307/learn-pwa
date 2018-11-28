@@ -1,11 +1,14 @@
-var CACHE_STATIC_NAME = 'static-v5';
-var CACHE_DYNAMIC_NAME = 'dynamic-v2';
+importScripts('/src/js/idb.js');
+
+var CACHE_STATIC_NAME = 'static-v6';
+var CACHE_DYNAMIC_NAME = 'dynamic-v3';
 var STATIC_FILES = [
     '/',
     '/index.html',
     '/offline.html',
     '/src/js/app.js',
     '/src/js/feed.js',
+    '/src/js/idb.js',
     // '/src/js/promise.js',
     // '/src/js/fetch.js',
     '/src/js/material.min.js',
@@ -21,6 +24,12 @@ var STATIC_FILES = [
 
     'https://fonts.gstatic.com/s/materialicons/v41/flUhRq6tzZclQEJ-Vdg-IuiaDsNc.woff2',
 ];
+
+var dbPromise = idb.open('posts-store', 1, function (db) {
+    if (!db.objectStoreNames.contains('posts')) {
+        db.createObjectStore('posts', {keyPath: 'id'});
+    }
+});
 
 /**
  * Удалять лишние элементы кэша
@@ -86,62 +95,82 @@ self.addEventListener('activate', function (event) {
 self.addEventListener('fetch', function (event) {
     console.log('[Service Worker] Fetching something ...', event);
 
-    var url = 'https://pwagram-99adf.firebaseio.com/posts';
+    var url = 'https://pwagramm-ad734.firebaseio.com/posts';
+
+    // if (event.request.url.indexOf(url) > -1) {
+    //     event.respondWith(
+    //         caches.open(CACHE_DYNAMIC_NAME)
+    //             .then(function (cache) {
+    //                 return fetch(event.request)
+    //                     .then(function (res) {
+    //                         // trimCache(CACHE_DYNAMIC_NAME, 3);
+    //                         cache.put(event.request, res.clone());
+    //                         return res;
+    //                     });
+    //             })
+    //     );
+    // }
 
     if (event.request.url.indexOf(url) > -1) {
-        event.respondWith(
-            caches.open(CACHE_DYNAMIC_NAME)
-                .then(function (cache) {
-                    return fetch(event.request)
-                        .then(function (res) {
-                            // trimCache(CACHE_DYNAMIC_NAME, 3);
-                            cache.put(event.request, res.clone());
-                            return res;
-                        });
-                })
+        event.respondWith(fetch(event.request)
+            .then(function (res) {
+                var clonedRes = res.clone();
+                clonedRes.json()
+                    .then(function(data) {
+                        for (var key in data) {
+                            dbPromise
+                                .then(function(db) {
+                                    var tx = db.transaction('posts', 'readwrite');
+                                    var store = tx.objectStore('posts');
+                                    store.put(data[key]);
+                                    return tx.complete;
+                                });
+                        }
+                    });
+                return res;
+            })
         );
     }
 
-
-    event.respondWith(
-        /**
-         * Проверить существует ли в кэше этот файл, если
-         * да, то вернуть этот файл
-         */
-        caches
-            .match(event.request)
-            .then(function (response) {
-                if (response) {
-                    return response;
-                } else {
-                    /**
-                     * В этом случае кэшируется все
-                     */
-                    return fetch(event.request)
-                        .then(function (res) {
-                            return caches.open(CACHE_DYNAMIC_NAME)
-                                .then(function (cache) {
-                                    cache.put(
-                                        event.request.url,
-                                        res.clone()
-                                    );
-
-                                    return res;
-                                })
-                        })
-                        /**
-                         * В случае ошибки и что то оказалось не закешированным.
-                         * Перекидываем на страницу типа 404
-                         */
-                        .catch(function (error) {
-                            return caches.open(CACHE_STATIC_NAME)
-                                .then(function (cache) {
-                                    if (event.request.headers.get('accept').includes('text/html')) {
-                                        return cache.match('/offline.html');
-                                    }
-                                })
-                        });
-                }
-            })
-    );
+    // event.respondWith(
+    //     /**
+    //      * Проверить существует ли в кэше этот файл, если
+    //      * да, то вернуть этот файл
+    //      */
+    //     caches
+    //         .match(event.request)
+    //         .then(function (response) {
+    //             if (response) {
+    //                 return response;
+    //             } else {
+    //                 /**
+    //                  * В этом случае кэшируется все
+    //                  */
+    //                 return fetch(event.request)
+    //                     .then(function (res) {
+    //                         return caches.open(CACHE_DYNAMIC_NAME)
+    //                             .then(function (cache) {
+    //                                 cache.put(
+    //                                     event.request.url,
+    //                                     res.clone()
+    //                                 );
+    //
+    //                                 return res;
+    //                             })
+    //                     })
+    //                     /**
+    //                      * В случае ошибки и что то оказалось не закешированным.
+    //                      * Перекидываем на страницу типа 404
+    //                      */
+    //                     .catch(function (error) {
+    //                         return caches.open(CACHE_STATIC_NAME)
+    //                             .then(function (cache) {
+    //                                 if (event.request.headers.get('accept').includes('text/html')) {
+    //                                     return cache.match('/offline.html');
+    //                                 }
+    //                             })
+    //                     });
+    //             }
+    //         })
+    // );
 });
